@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:satep/screen/CadastroUsuario/SignUpScreen.dart';
+import 'package:satep/screen/CadastroUsuario/CadastroUsuarioScreen.dart';
 import 'package:satep/screen/Login/login.dart';
 
 class Home extends StatelessWidget {
@@ -97,7 +97,7 @@ class Home extends StatelessWidget {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.push(context,  MaterialPageRoute(builder: (context) => SignUpScreen()),
+                            Navigator.push(context,  MaterialPageRoute(builder: (context) => CadastroUsuarioScreen()),
                             );
                           },
                           style: ElevatedButton.styleFrom(

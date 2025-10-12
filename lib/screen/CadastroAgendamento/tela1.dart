@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:satep/screen/CadastroAgendamento/tela2.dart';
 
-class NovoAgendamentoScreen extends StatefulWidget {
-  const NovoAgendamentoScreen({super.key});
+class NovoAgendamento extends StatefulWidget {
+  const NovoAgendamento({super.key});
 
   @override
-  State<NovoAgendamentoScreen> createState() => _NovoAgendamentoScreenState();
+  State<NovoAgendamento> createState() => _NovoAgendamentoScreenState();
 }
 
-class _NovoAgendamentoScreenState extends State<NovoAgendamentoScreen> {
+class _NovoAgendamentoScreenState extends State<NovoAgendamento> {
   bool _acompanha = false;
   String? _enderecoSelecionado;
 
