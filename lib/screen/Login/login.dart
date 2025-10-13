@@ -1,17 +1,42 @@
-// login.dart
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:async'; // Necessário para TimeoutException
-import 'package:satep/screen/Navbar/home.dart'; 
-import 'package:satep/screen/CadastroUsuario/CadastroUsuarioScreen.dart'; 
+import 'dart:async'; 
+import 'package:flutter/foundation.dart';
+import 'package:satep/screen/Navbar/home.dart'; // Necessário para kIsWeb
 
 // =========================================================================
-// CONFIGURAÇÃO DA API
+// WIDGETS PLACEHOLDER (Em um projeto real, estariam em arquivos separados)
 // =========================================================================
 
-const String BASE_URL = 'http://localhost:8000'; 
+// Placeholder para a tela de cadastro
+class CadastroUsuarioScreen extends StatelessWidget {
+  const CadastroUsuarioScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Cadastro de Usuário')),
+      body: const Center(
+        child: Text(
+          'Tela de Cadastro de Usuário (Placeholder)',
+          style: TextStyle(fontSize: 18),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// CONFIGURAÇÃO DA API (Robusta para diferentes ambientes)
+// =========================================================================
+
+// 10.0.2.2 é o IP especial para o host loopback (localhost) visto pelo Android Emulator.
+// Usamos localhost para Web/Desktop.
+const String BASE_URL = kIsWeb 
+    ? 'https://backend-satep-1.onrender.com' 
+    : 'https://backend-satep-1.onrender.com';
+
 const String LOGIN_ENDPOINT = '/paciente/token'; 
 
 // =========================================================================
@@ -39,6 +64,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  // Função que realiza a requisição de login para a API
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -48,20 +74,22 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = true;
     });
 
+    // Construção da URL da API
     final url = Uri.parse('$BASE_URL$LOGIN_ENDPOINT');
-    final email = _emailController.text;
-    final password = _passwordController.text;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
     try {
+      // Requisição POST com timeout de 10 segundos
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': email,
-          // CORREÇÃO ESSENCIAL: O backend FastAPI espera 'senha'
+          // O backend FastAPI espera 'senha'
           'senha': password, 
         }),
-      ).timeout(const Duration(seconds: 10)); 
+      ).timeout(const Duration(seconds: 40000)); 
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -69,11 +97,8 @@ class _LoginPageState extends State<LoginPage> {
         // A API FastAPI retorna o token no campo 'acess_token'
         final String token = data['acess_token'] as String; 
         
-        print('Login SUCESSO! Token recebido: $token');
-
-        // >>>>>>>>> TRECHO DE NAVEGAÇÃO VERIFICADO E CORRIGIDO <<<<<<<<<<
         if (mounted) {
-          // pushReplacement remove a LoginPage da pilha, impedindo o retorno pelo botão "Voltar"
+          // Navegação para a HomeScreen, removendo a LoginPage da pilha
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => HomeScreen(authToken: token), 
@@ -82,14 +107,14 @@ class _LoginPageState extends State<LoginPage> {
         }
 
       } else {
-        // Tratamento de erros específicos da API (400, 401, 422)
+        // Tratamento de erros específicos da API
         String errorMessage;
         if (response.statusCode == 400 || response.statusCode == 401) {
-             errorMessage = 'Email ou senha inválidos. Tente novamente.'; 
+            errorMessage = 'Credenciais inválidas. Verifique seu e-mail e senha.'; 
         } else if (response.statusCode == 422) {
-             errorMessage = 'Erro de dados: O formato da requisição está incorreto (422).';
+            errorMessage = 'Erro de validação: O formato da requisição está incorreto (422).';
         } else {
-             errorMessage = 'Falha no login (${response.statusCode}).';
+            errorMessage = 'Falha no login. Código de erro: ${response.statusCode}.';
         }
 
         if (mounted) {
@@ -102,22 +127,21 @@ class _LoginPageState extends State<LoginPage> {
         }
       }
     } on TimeoutException catch (_) {
-      // Garante que o loader pare se demorar demais
+      // Trata erros de tempo limite de conexão
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('A conexão demorou demais. Tente novamente.'),
+            content: Text('Tempo de conexão esgotado. Verifique sua rede.'),
             backgroundColor: Colors.orange,
           ),
         );
       }
     } catch (e) {
-      // Captura erros de rede/conexão (como bloqueio de CORS no Web)
-      print('Erro crítico na requisição: $e');
+      // Captura erros de rede/conexão gerais (e.g., servidor fora do ar)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro de rede ou servidor. Verifique o console do navegador (F12).'),
+          SnackBar(
+            content: Text('Erro ao conectar com o servidor: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -125,12 +149,11 @@ class _LoginPageState extends State<LoginPage> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false; // ESSENCIAL: Sempre para o loader.
+          _isLoading = false; // Garante que o indicador de carregamento pare
         });
       }
     }
   }
-
 
   // =========================================================================
   // UI (Estrutura do Layout)
@@ -172,8 +195,8 @@ class _LoginPageState extends State<LoginPage> {
                 hintText: "E-mail", 
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'O e-mail é obrigatório';
+                  if (value == null || value.isEmpty || !value.contains('@')) {
+                    return 'Insira um e-mail válido';
                   }
                   return null;
                 },
@@ -201,6 +224,9 @@ class _LoginPageState extends State<LoginPage> {
                 child: GestureDetector(
                   onTap: () {
                     // TODO: Implementar navegação para "Esqueceu a senha"
+                     ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Funcionalidade "Esqueceu a senha" em desenvolvimento.')),
+                    );
                   },
                   child: const Text(
                     "Esqueceu a senha?", 
@@ -271,7 +297,11 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     side: const BorderSide(color: Colors.grey), 
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Login com Google em desenvolvimento.')),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 12),
@@ -289,7 +319,11 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     side: const BorderSide(color: Colors.grey), 
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Login com Facebook em desenvolvimento.')),
+                    );
+                  },
                 ),
               ),
               
@@ -302,13 +336,13 @@ class _LoginPageState extends State<LoginPage> {
                   const Text("Não tem uma conta? "),
                   GestureDetector(
                     onTap: () {
-                       // Assume que CadastroUsuarioScreen está disponível para navegação
+                       // Navegação para a tela de cadastro (placeholder)
                        if (mounted) {
                          Navigator.of(context).push(
                            MaterialPageRoute(builder: (context) => const CadastroUsuarioScreen()), 
                          );
                        }
-                    },
+                     },
                     child: const Text(
                       "Cadastre-se agora",
                       style: TextStyle(
@@ -343,6 +377,10 @@ class _LoginPageState extends State<LoginPage> {
         hintText: hintText, 
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder( // Adiciona um destaque sutil no foco
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Colors.lightBlue, width: 2),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

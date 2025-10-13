@@ -2,122 +2,176 @@ import 'package:flutter/material.dart';
 import 'package:satep/screen/CadastroUsuario/CadastroUsuarioScreen.dart';
 import 'package:satep/screen/Login/login.dart';
 
-class Home extends StatelessWidget {
+class Home extends StatefulWidget {
   const Home({super.key});
 
   @override
+  State<Home> createState() => _HomeState();
+}
+
+class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2));
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       body: Stack(
         children: [
-          // Fundo azul
+          // Fundo com degradê elegante
           Container(
-            color: const Color(0xFF4AC1F0), // cor do fundo da imagem
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF4AC1F0), Color(0xFF1E88E5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
           ),
 
-          // Conteúdo da tela
+          // Elemento circular decorativo
+          Positioned(
+            top: -100,
+            left: -60,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+
+          // Imagem no canto inferior direit
+
+          // Conteúdo principal com animação
           SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 60),
-                // Logo ou título
-                Center(
-                  child: Column(
-                    children: const [
-                      Icon(
-                        Icons.public, // substituindo logo por ícone
-                        color: Colors.white,
-                        size: 60,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        "SATEP",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 90),
+
+                    // Logo e título
+                    Column(
+                      children: const [
+                        Icon(Icons.public, color: Colors.white, size: 65),
+                        SizedBox(height: 12),
+                        Text(
+                          "SATEP",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // Texto informativo
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 32.0),
-                  child: Text(
-                    "Ajudando você a se manter saudável!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
+                      ],
                     ),
-                  ),
-                ),
 
-                const Spacer(),
+                    const SizedBox(height: 32),
 
-                // Imagem da pessoa
-                SizedBox(
-                  height: 250,
-                  child: Image.asset(
-                    'assets/images/person.png', // substitua pelo caminho da imagem
-                    fit: BoxFit.contain,
-                  ),
-                ),
+                    // Frase inspiracional
+                    const Text(
+                      "Cuidando da sua saúde com tecnologia e eficiência.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        height: 1.5,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
 
-                const SizedBox(height: 20),
+                    const Spacer(),
 
-                // Botões
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(context,  MaterialPageRoute(builder: (context) => LoginPage()),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                    // Botões
+                    Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => LoginPage()),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              "Entrar",
+                              style: TextStyle(
+                                color: Color(0xFF1E88E5),
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          child: const Text("Entrar"),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(context,  MaterialPageRoute(builder: (context) => CadastroUsuarioScreen()),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.7),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => CadastroUsuario()),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side:
+                                  const BorderSide(color: Colors.white, width: 2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              "Criar conta",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                          child: const Text(
-                            "Crie uma conta",
-                            style: TextStyle(color: Colors.black),
-                          ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
-                  ),
+                        const SizedBox(height: 60),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],

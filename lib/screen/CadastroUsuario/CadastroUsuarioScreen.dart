@@ -1,75 +1,91 @@
-// cadastroUsuario.dart (Tela de Cadastro de Usuário estilizada)
+// cadastroUsuarioScreen.dart
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// Importe a tela de verificação pendente (baseado na imagem 655006.png)
-
 
 // =========================================================================
 // VARIÁVEIS DE ESTILO
 // =========================================================================
 
-const Color primaryColor = Color(0xFF4FC3F7); // Azul claro vibrante
-const Color secondaryColor = Color(0xFF03A9F4); // Azul primário (botão)
+const Color primaryColor = Color(0xFF4FC3F7);
+const Color secondaryColor = Color(0xFF03A9F4);
 const Color backgroundColor = Colors.white;
-const Color inputFillColor = Color(0xFFF5F5F5); // Fundo cinza claro para inputs
+const Color inputFillColor = Color(0xFFF5F5F5);
 
 // =========================================================================
-// CONFIGURAÇÃO DA API E MODELOS (Mantidos)
+// CONFIGURAÇÃO DA API
 // =========================================================================
 
-const String BASE_URL = 'http://sua-api-aqui.com/api'; 
-const String SIGNUP_ENDPOINT = '/usuario/cadastro'; 
+const String BASE_URL = 'https://backend-satep-1.onrender.com';
+const String SIGNUP_ENDPOINT = '/pacientes';
+
+// =========================================================================
+// MODELO DE DADOS
+// =========================================================================
 
 class CadastroData {
-  // Passo 1: Dados Pessoais
   String? nomeCompleto;
   String? cpf;
   String? telefone;
   String? email;
   String? senha;
   String? confirmarSenha;
-
-  // Passo 2: Dados de Endereço
   String? endereco;
   String? bairro;
   String? complemento;
 
   Map<String, dynamic> toJson() => {
-        'nomeCompleto': nomeCompleto,
-        'cpf': cpf,
-        'telefone': telefone,
-        'email': email,
-        'senha': senha,
-        'endereco': endereco,
-        'bairro': bairro,
-        'complemento': complemento,
-      };
+  'nome': nomeCompleto,
+  'cpf': cpf,
+  'telefone': telefone,
+  'email': email,
+  'senha': senha,
+  'nr_endereco': complemento, // se for o número ou complemento
+  'nm_endereco': endereco,
+  'nm_bairro': bairro,
+  'nm_municipio': 'Mongaguá', // ou pegue de um input se quiser
+};
 }
 
 class CadastroApiService {
   Future<bool> registerUser(CadastroData data) async {
-    print("Enviando Cadastro: ${jsonEncode(data.toJson())}");
-    
-    // Simulação de Sucesso
-    await Future.delayed(const Duration(seconds: 2));
-    return true; 
+    print("📦 Enviando Cadastro: ${jsonEncode(data.toJson())}");
+
+    try {
+      final uri = Uri.parse('$BASE_URL$SIGNUP_ENDPOINT');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(data.toJson()),
+      );
+
+      print("📡 Resposta: ${response.statusCode} - ${response.body}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print("❌ Erro ao registrar: $e");
+      return false;
+    }
   }
 }
 
 // =========================================================================
-// WIDGET PRINCIPAL (CadastroUsuarioScreen)
+// TELA PRINCIPAL DE CADASTRO
 // =========================================================================
 
-class CadastroUsuarioScreen extends StatefulWidget {
-  const CadastroUsuarioScreen({super.key});
+class CadastroUsuario extends StatefulWidget {
+  const CadastroUsuario({super.key});
 
   @override
-  State<CadastroUsuarioScreen> createState() => _CadastroUsuarioScreenState();
+  State<CadastroUsuario> createState() => _CadastroUsuarioState();
 }
 
-class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
+class _CadastroUsuarioState extends State<CadastroUsuario> {
   final CadastroData _cadastroData = CadastroData();
   final CadastroApiService _apiService = CadastroApiService();
   int _currentStep = 1;
@@ -82,20 +98,16 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
     if (_currentStep == 1) {
       if (_userFormKey.currentState!.validate()) {
         _userFormKey.currentState!.save();
-        setState(() {
-          _currentStep = 2;
-        });
+        setState(() => _currentStep = 2);
       }
     }
   }
 
   void _goToPreviousStep() {
     if (_currentStep == 2) {
-      setState(() {
-        _currentStep = 1;
-      });
+      setState(() => _currentStep = 1);
     } else {
-      Navigator.of(context).pop(); 
+      Navigator.of(context).pop();
     }
   }
 
@@ -103,29 +115,27 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
     if (_currentStep == 2) {
       if (_addressFormKey.currentState!.validate()) {
         _addressFormKey.currentState!.save();
-
-        setState(() {
-          _isSubmitting = true;
-        });
+        setState(() => _isSubmitting = true);
 
         final success = await _apiService.registerUser(_cadastroData);
 
-        setState(() {
-          _isSubmitting = false;
-        });
+        setState(() => _isSubmitting = false);
 
-        if (mounted) {
-          if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Cadastro realizado. Verifique seu e-mail.'), backgroundColor: Colors.green));
-            // Navega para a tela de Verificação Pendente
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const EmailVerificacaoScreen()), 
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Erro ao cadastrar. Tente novamente.'), backgroundColor: Colors.red));
-          }
+        if (!mounted) return;
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Cadastro realizado com sucesso! Verifique seu e-mail.'),
+            backgroundColor: Colors.green,
+          ));
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const EmailVerificacaoScreen()),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Erro ao cadastrar. Tente novamente.'),
+            backgroundColor: Colors.red,
+          ));
         }
       }
     }
@@ -134,15 +144,8 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
   @override
   Widget build(BuildContext context) {
     String buttonText = _currentStep == 1 ? 'Próximo' : 'Concluir';
-    VoidCallback? onPressed;
-
-    if (_isSubmitting) {
-      onPressed = null;
-    } else if (_currentStep == 1) {
-      onPressed = _goToNextStep;
-    } else {
-      onPressed = _submitRegistration;
-    }
+    VoidCallback? onPressed =
+        _isSubmitting ? null : (_currentStep == 1 ? _goToNextStep : _submitRegistration);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -150,30 +153,21 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header e Indicador de Passo (Top Bar)
             _buildHeader(context),
-            
-            // Título e Subtítulo
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Crie a sua conta', //
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
+                  Text('Crie a sua conta',
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                   SizedBox(height: 4),
-                  Text(
-                    'Digite suas informações para fazer Login', //
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
+                  Text('Digite suas informações para fazer login',
+                      style: TextStyle(fontSize: 14, color: Colors.grey)),
                 ],
               ),
             ),
             const SizedBox(height: 30),
-            
-            // Conteúdo da Tela (Passo 1 ou 2)
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -182,8 +176,6 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
                     : AddressStep(formKey: _addressFormKey, data: _cadastroData),
               ),
             ),
-            
-            // Botão de Ação (Com Efeito Gradiente e Arredondamento)
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Container(
@@ -200,18 +192,15 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
                 child: ElevatedButton(
                   onPressed: onPressed,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent, // Transparente para mostrar o gradiente
+                    backgroundColor: Colors.transparent,
                     foregroundColor: Colors.white,
                     shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: _isSubmitting
                       ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                      : Text(
-                          buttonText, 
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                      : Text(buttonText,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
@@ -231,7 +220,6 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
             onPressed: _goToPreviousStep,
           ),
           const Spacer(),
-          // Indicador de Passo Estilizado
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -239,11 +227,11 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${_currentStep}/2', 
+              '$_currentStep/2',
               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
-          const Spacer(flex: 2), 
+          const Spacer(flex: 2),
         ],
       ),
     );
@@ -251,7 +239,7 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
 }
 
 // =========================================================================
-// WIDGET DE CAMPO DE TEXTO ESTILIZADO (Reutilizável)
+// TEXTFIELD PERSONALIZADO
 // =========================================================================
 
 class CustomTextField extends StatelessWidget {
@@ -260,6 +248,7 @@ class CustomTextField extends StatelessWidget {
   final String? Function(String?) validator;
   final TextInputType keyboardType;
   final bool isPassword;
+  final TextEditingController? controller;
 
   const CustomTextField({
     super.key,
@@ -268,6 +257,7 @@ class CustomTextField extends StatelessWidget {
     required this.validator,
     this.keyboardType = TextInputType.text,
     this.isPassword = false,
+    this.controller,
   });
 
   @override
@@ -275,31 +265,16 @@ class CustomTextField extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
       child: TextFormField(
+        controller: controller,
         obscureText: isPassword,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.grey),
           filled: true,
           fillColor: inputFillColor,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          suffixIcon: isPassword 
-              ? Icon(Icons.visibility_off, color: Colors.grey.shade600) //
-              : null,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10), // Bordas arredondadas
-            borderSide: BorderSide.none, // Sem borda visível
-          ),
-          enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: secondaryColor, width: 2), // Borda colorida ao focar
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Colors.red, width: 1),
           ),
         ),
         keyboardType: keyboardType,
@@ -311,59 +286,70 @@ class CustomTextField extends StatelessWidget {
 }
 
 // =========================================================================
-// PASSO 1: DADOS PESSOAIS (UserStep) - Usa CustomTextField
+// PASSO 1: DADOS PESSOAIS
 // =========================================================================
 
-class UserStep extends StatelessWidget {
+class UserStep extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final CadastroData data;
 
   const UserStep({super.key, required this.formKey, required this.data});
 
   @override
+  State<UserStep> createState() => _UserStepState();
+}
+
+class _UserStepState extends State<UserStep> {
+  final TextEditingController senhaController = TextEditingController();
+  final TextEditingController confirmarSenhaController = TextEditingController();
+
+  @override
   Widget build(BuildContext context) {
     return Form(
-      key: formKey,
+      key: widget.formKey,
       child: Column(
         children: [
           CustomTextField(
-            label: 'Nome completo', //
-            onSaved: (value) => data.nomeCompleto = value,
-            validator: (value) => value!.isEmpty ? 'Nome é obrigatório' : null,
+            label: 'Nome completo',
+            onSaved: (v) => widget.data.nomeCompleto = v,
+            validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
           ),
           CustomTextField(
-            label: 'CPF', 
-            onSaved: (value) => data.cpf = value,
-            validator: (value) => value!.length != 11 ? 'CPF inválido' : null,
+            label: 'CPF',
             keyboardType: TextInputType.number,
+            onSaved: (v) => widget.data.cpf = v,
+            validator: (v) => v!.length != 11 ? 'CPF inválido' : null,
           ),
           CustomTextField(
-            label: 'Telefone', //
-            onSaved: (value) => data.telefone = value,
-            validator: (value) => value!.isEmpty ? 'Telefone é obrigatório' : null,
+            label: 'Telefone',
             keyboardType: TextInputType.phone,
+            onSaved: (v) => widget.data.telefone = v,
+            validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
           ),
           CustomTextField(
-            label: 'Email', //
-            onSaved: (value) => data.email = value,
-            validator: (value) => value!.isEmpty || !value.contains('@') ? 'E-mail inválido' : null,
+            label: 'E-mail',
             keyboardType: TextInputType.emailAddress,
+            onSaved: (v) => widget.data.email = v,
+            validator: (v) =>
+                v!.isEmpty || !v.contains('@') ? 'E-mail inválido' : null,
           ),
           CustomTextField(
-            label: 'Senha', //
-            onSaved: (value) => data.senha = value,
-            validator: (value) => value!.length < 6 ? 'Mínimo de 6 caracteres' : null,
+            label: 'Senha',
+            controller: senhaController,
             isPassword: true,
+            onSaved: (v) => widget.data.senha = v,
+            validator: (v) => v!.length < 6 ? 'Mínimo 6 caracteres' : null,
           ),
           CustomTextField(
-            label: 'Confirme a senha', //
-            onSaved: (value) => data.confirmarSenha = value,
-            validator: (value) {
-              if (value!.isEmpty) return 'Confirmação obrigatória';
-              if (value != data.senha) return 'As senhas não coincidem';
+            label: 'Confirmar senha',
+            controller: confirmarSenhaController,
+            isPassword: true,
+            onSaved: (v) => widget.data.confirmarSenha = v,
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Confirmação obrigatória';
+              if (v != senhaController.text) return 'As senhas não coincidem';
               return null;
             },
-            isPassword: true,
           ),
           const SizedBox(height: 30),
         ],
@@ -373,7 +359,7 @@ class UserStep extends StatelessWidget {
 }
 
 // =========================================================================
-// PASSO 2: ENDEREÇO (AddressStep) - Usa CustomTextField
+// PASSO 2: ENDEREÇO
 // =========================================================================
 
 class AddressStep extends StatelessWidget {
@@ -387,22 +373,21 @@ class AddressStep extends StatelessWidget {
     return Form(
       key: formKey,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CustomTextField(
-            label: 'Endereço', //
-            onSaved: (value) => data.endereco = value,
-            validator: (value) => value!.isEmpty ? 'Endereço é obrigatório' : null,
+            label: 'Endereço',
+            onSaved: (v) => data.endereco = v,
+            validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
           ),
           CustomTextField(
-            label: 'Bairro', //
-            onSaved: (value) => data.bairro = value,
-            validator: (value) => value!.isEmpty ? 'Bairro é obrigatório' : null,
+            label: 'Bairro',
+            onSaved: (v) => data.bairro = v,
+            validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
           ),
           CustomTextField(
-            label: 'Complemento', //
-            onSaved: (value) => data.complemento = value,
-            validator: (value) => null, // Campo opcional
+            label: 'Complemento',
+            onSaved: (v) => data.complemento = v,
+            validator: (v) => null,
           ),
           const SizedBox(height: 30),
         ],
@@ -412,10 +397,9 @@ class AddressStep extends StatelessWidget {
 }
 
 // =========================================================================
-// WIDGET PLACEHOLDER DE CONFIRMAÇÃO (EmailVerificacaoScreen)
+// TELA DE VERIFICAÇÃO DE EMAIL
 // =========================================================================
 
-// Crie este arquivo em 'satep/screen/EmailVerificacaoScreen.dart'
 class EmailVerificacaoScreen extends StatelessWidget {
   const EmailVerificacaoScreen({super.key});
 
@@ -430,73 +414,30 @@ class EmailVerificacaoScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Verificação pendente', style: TextStyle(color: Colors.grey)), //
-                const SizedBox(height: 50),
-                Icon(Icons.check_circle_outline, color: primaryColor, size: 80), 
+                const Icon(Icons.email_outlined, color: primaryColor, size: 80),
                 const SizedBox(height: 20),
                 const Text(
-                  'Confirme o seu E-mail',
+                  'Verificação pendente',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16.0),
                   child: Text(
-                    'Uma verificação foi enviada para o seu E-mail. O seu cadastro será concluído assim que for confirmado.', //
+                    'Um e-mail de verificação foi enviado. Confirme para concluir seu cadastro.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
                 ),
-                // Adicionando um placeholder para a imagem do celular
-                Container(
-                  width: 150,
-                  height: 150,
-                  margin: const EdgeInsets.only(bottom: 30),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.grey.shade300)
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
                   ),
-                  child: Center(child: Icon(Icons.phone_android, size: 50, color: Colors.grey.shade500)),
-                ),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      gradient: const LinearGradient(
-                        colors: [primaryColor, secondaryColor],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Geralmente volta para a tela de login
-                        Navigator.of(context).popUntil((route) => route.isFirst); 
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: Colors.white,
-                        shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('Fazer login', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), //
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Simulação: E-mail de confirmação reenviado.')));
-                  },
-                  child: const Text(
-                    'Enviar outra confirmação', //
-                    style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-                  ),
+                  child: const Text('Voltar ao Login',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

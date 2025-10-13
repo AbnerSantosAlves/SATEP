@@ -1,28 +1,30 @@
-// cadastroAgendamento.dart 
+// lib/screen/CadastroAgendamento/cadastroAgendamento.dart 
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
+import 'package:satep/screen/Navbar/home.dart'; 
 
 // =========================================================================
 // CONFIGURAÇÃO DA API E MODELOS
 // =========================================================================
 
-const String BASE_URL = 'http://sua-api-aqui.com/api'; 
+// Endereços do backend
+const String BASE_URL = 'https://backend-satep-1.onrender.com'; 
 const String ADDRESS_ENDPOINT = '/paciente/enderecos';
-const String OPTIONS_ENDPOINT = '/dados/opcoes'; 
-const String APPOINTMENT_ENDPOINT = '/agendamento/novo';
+const String OPTIONS_ENDPOINT = '/hospitais'; 
+const String APPOINTMENT_ENDPOINT = '/agendamento/novo'; 
+const String ME_ENDPOINT = '/paciente/me'; 
 
-// --- Modelos de Dados (Agendamento, Endereco, HospitalMunicipio) ---
+// --- Modelos de Dados (Endereco, PacienteMeData, HospitalMunicipio) ---
 
 class Endereco {
-  final String id;
   final String logradouro;
   final String numero;
   final String bairro;
 
   Endereco({
-    required this.id,
     required this.logradouro,
     required this.numero,
     required this.bairro,
@@ -30,10 +32,10 @@ class Endereco {
 
   factory Endereco.fromJson(Map<String, dynamic> json) {
     return Endereco(
-      id: json['id'].toString(), 
-      logradouro: json['logradouro'] as String,
-      numero: json['numero'].toString(), 
-      bairro: json['bairro'] as String,
+      // Tentando capturar diferentes nomes de campo (para endereços e me_endpoint)
+      logradouro: json['nm_endereco'] as String? ?? json['logradouro'] as String,
+      numero: json['nr_endereco'].toString(), 
+      bairro: json['nm_bairro'] as String? ?? json['bairro'] as String,
     );
   }
 
@@ -41,28 +43,67 @@ class Endereco {
   String toString() => '$logradouro, $numero - $bairro';
 }
 
-class HospitalMunicipio {
-  final String id;
+class PacienteMeData {
   final String nome;
+  final String sobrenome;
+  final Endereco enderecoPrincipal; 
 
-  HospitalMunicipio({required this.id, required this.nome});
-
-  factory HospitalMunicipio.fromJson(Map<String, dynamic> json) {
-    return HospitalMunicipio(
-      id: json['id'].toString(),
-      nome: json['nome'] as String,
+  PacienteMeData({
+    required this.nome,
+    required this.sobrenome,
+    required this.enderecoPrincipal,
+  });
+  
+  factory PacienteMeData.fromPacienteJson(Map<String, dynamic> json) {
+    final endereco = Endereco(
+      logradouro: json['nm_endereco'] ?? '',
+      numero: json['nr_endereco']?.toString() ?? '',
+      bairro: json['nm_bairro'] ?? '',
+    );
+    
+    String nomeCompleto = json['nome'] as String? ?? 'Paciente';
+    List<String> partes = nomeCompleto.split(' ');
+    String nome = partes.isNotEmpty ? partes.first : nomeCompleto;
+    String sobrenome = partes.length > 1 ? partes.sublist(1).join(' ') : '';
+    
+    return PacienteMeData(
+      nome: nome,
+      sobrenome: sobrenome,
+      enderecoPrincipal: endereco,
     );
   }
 }
 
+class HospitalMunicipio {
+  final String id;
+  final String nomeHospital;
+  final String nomeMunicipio;
+
+  HospitalMunicipio({
+    required this.id,
+    required this.nomeHospital,
+    required this.nomeMunicipio,
+  });
+
+  factory HospitalMunicipio.fromJson(Map<String, dynamic> json) {
+    return HospitalMunicipio(
+      id: json['id']?.toString() ?? '-1',
+      nomeHospital: json['nome'] ?? 'Hospital Indisponível',
+      nomeMunicipio: json['municipio'] ?? 'Município não informado',
+    );
+  }
+
+  @override
+  String toString() => "$nomeHospital - $nomeMunicipio";
+}
+
+
 class AppointmentData {
-  // Paciente (Tela 1)
   String? nome;
   String? sobrenome;
   bool comAcompanhante = false;
   Endereco? enderecoSelecionado;
   
-  // Viagem/Consulta (Tela 2)
   HospitalMunicipio? hospitalSelecionado;
   HospitalMunicipio? municipioSelecionado;
   String? procedimento;
@@ -71,91 +112,134 @@ class AppointmentData {
   String? documentoAnexado; 
   String? observacao;
 
+  // Mapeamento para snake_case (padrão FastAPI/Python)
   Map<String, dynamic> toJson() => {
-        'nome': nome,
-        'sobrenome': sobrenome,
-        'comAcompanhante': comAcompanhante,
-        'enderecoId': enderecoSelecionado?.id,
-        'hospitalId': hospitalSelecionado?.id,
-        'municipioId': municipioSelecionado?.id,
+        'hospital_id': int.tryParse(hospitalSelecionado?.id ?? '') ?? 0, 
+        'data_agendamento': dataSelecionada != null 
+            ? DateFormat('yyyy-MM-dd').format(dataSelecionada!) 
+            : null,
+        'hora_agendamento': horaSelecionada != null 
+            ? '${horaSelecionada!.hour.toString().padLeft(2, '0')}:${horaSelecionada!.minute.toString().padLeft(2, '0')}:00' 
+            : null,
+        
+        'nm_endereco': enderecoSelecionado?.logradouro,
+        'nr_endereco': enderecoSelecionado?.numero,
+        'nm_bairro': enderecoSelecionado?.bairro,
+        'nm_cidade': municipioSelecionado?.nomeMunicipio, // Mapeado para nm_cidade
+        
+        'ds_agendamento': observacao,
+        
         'procedimento': procedimento,
-        'dataConsulta': dataSelecionada?.toIso8601String().substring(0, 10), 
-        'horaConsulta': horaSelecionada != null ? 
-            '${horaSelecionada!.hour.toString().padLeft(2, '0')}:${horaSelecionada!.minute.toString().padLeft(2, '0')}' : null,
-        'documentoAnexadoNome': documentoAnexado, 
-        'observacao': observacao,
       };
 }
 
 // --- Serviços de Requisições HTTP ---
 
 class ApiService {
-  final String authToken; 
+  final String authToken; // Token passado na inicialização
 
   ApiService({required this.authToken});
 
+  // GERA O HEADER COM O TOKEN PARA TODAS AS REQUISIÇÕES
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer $authToken', 
   };
+  
+  // Requisição: /paciente/me
+  Future<PacienteMeData?> fetchPatientMe() async {
+    final uri = Uri.parse('$BASE_URL$ME_ENDPOINT');
+    
+    if (authToken.isEmpty) {
+        // Simulação se token estiver vazio (apenas para fallback de teste)
+        return PacienteMeData.fromPacienteJson({
+            'nome': 'João Silva', 
+            'nm_endereco': 'Av. Principal',
+            'nr_endereco': 100,
+            'nm_bairro': 'Centro',
+        });
+    }
 
+    try {
+      final response = await http.get(uri, headers: _headers); // Usa _headers
+      if (response.statusCode == 200) {
+        final utf8Body = utf8.decode(response.bodyBytes);
+        final data = jsonDecode(utf8Body);
+        return PacienteMeData.fromPacienteJson(data);
+      } else {
+        print('Falha ao carregar dados do paciente: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Erro de rede ao buscar /paciente/me: $e');
+      return null;
+    }
+  }
+
+  // Requisição: /paciente/enderecos
   Future<List<Endereco>> fetchUserAddresses() async {
     final uri = Uri.parse('$BASE_URL$ADDRESS_ENDPOINT');
     
-    // Simulação de dados para facilitar o desenvolvimento se a API falhar
     if (authToken.isEmpty) {
         return [
-            Endereco(id: '1', logradouro: 'Av. Nossa Sra. de Fátima', numero: '204', bairro: 'Balneario...'),
-            Endereco(id: '2', logradouro: 'Av. Monteiro Lobato', numero: '12092', bairro: 'Balneário...'),
+            Endereco(logradouro: 'Av. Nossa Sra. de Fátima', numero: '204', bairro: 'Balneario A'),
+            Endereco(logradouro: 'Av. Monteiro Lobato', numero: '12092', bairro: 'Balneário B'),
         ];
     }
     
     try {
-      final response = await http.get(uri, headers: _headers);
+      final response = await http.get(uri, headers: _headers); // Usa _headers
       if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
+        final utf8Body = utf8.decode(response.bodyBytes);
+        final List<dynamic> data = jsonDecode(utf8Body);
         return data.map((item) => Endereco.fromJson(item)).toList();
       } else {
-        throw Exception('Falha ao carregar endereços: ${response.statusCode}');
+        return [];
       }
     } catch (e) {
-      print('Erro de rede ao buscar endereços: $e');
       return []; 
     }
   }
 
-  Future<List<HospitalMunicipio>> fetchOptions(String type) async {
-    final uri = Uri.parse('$BASE_URL$OPTIONS_ENDPOINT?tipo=$type'); 
-    
-    // Simulação de dados para facilitar o desenvolvimento
-    if (authToken.isEmpty) {
-        if (type == 'hospital') {
-            return [HospitalMunicipio(id: '101', nome: 'Hospital A'), HospitalMunicipio(id: '102', nome: 'Hospital B')];
-        } else if (type == 'municipio') {
-             return [HospitalMunicipio(id: '201', nome: 'Cidade X'), HospitalMunicipio(id: '202', nome: 'Cidade Y')];
-        }
-    }
-    
-    try {
-      final response = await http.get(uri, headers: _headers);
-      if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        return data.map((item) => HospitalMunicipio.fromJson(item)).toList();
-      } else {
-        throw Exception('Falha ao carregar $type: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Erro de rede ao buscar $type: $e');
-      return [];
-    }
+  Future<List<HospitalMunicipio>> fetchOptions() async {
+  final uri = Uri.parse('$BASE_URL$OPTIONS_ENDPOINT');
+  print('🛰️ Buscando hospitais em: $uri');
+  print('🔑 Token enviado: $authToken');
+  print('📦 Headers: $_headers');
+
+  if (authToken.isEmpty) {
+    print('⚠️ Token vazio — retornando lista simulada.');
+    return [
+      HospitalMunicipio(id: '1', nomeHospital: 'Hospital Central', nomeMunicipio: 'Mongaguá'),
+      HospitalMunicipio(id: '2', nomeHospital: 'Clínica São Judas', nomeMunicipio: 'Itanhaém'),
+    ];
   }
 
+  try {
+    final response = await http.get(uri, headers: _headers);
+    print('Resposta (${response.statusCode}): ${response.body}');
+
+    if (response.statusCode == 200) {
+       final utf8Body = utf8.decode(response.bodyBytes);
+       final List<dynamic> data = jsonDecode(utf8Body);
+       return data.map((item) => HospitalMunicipio.fromJson(item)).toList();
+    } else {
+      print('Falha ao carregar hospitais: ${response.statusCode}');
+      return [];
+    }
+  } catch (e) {
+    print('Erro ao buscar hospitais: $e');
+    return [];
+  }
+}
+
+  // Requisição: /agendamento/novo
   Future<bool> sendAppointmentData(AppointmentData data) async {
     final uri = Uri.parse('$BASE_URL$APPOINTMENT_ENDPOINT');
     
-    print("Enviando Agendamento: ${jsonEncode(data.toJson())}");
+    final payload = data.toJson();
+    print("Enviando Agendamento: ${jsonEncode(payload)}");
     
-    // Simulação de Sucesso
     if (authToken.isEmpty) {
         await Future.delayed(const Duration(seconds: 2));
         return true; 
@@ -164,10 +248,11 @@ class ApiService {
     try {
       final response = await http.post(
         uri,
-        headers: _headers,
-        body: jsonEncode(data.toJson()),
+        headers: _headers, // Usa _headers
+        body: jsonEncode(payload),
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        print('Agendamento criado com sucesso! Status: ${response.statusCode}');
         return true; 
       } else {
         print('Erro no servidor (${response.statusCode}): ${response.body}');
@@ -180,7 +265,7 @@ class ApiService {
   }
 }
 
-// --- Simulação de File Picker ---
+// --- Simulação de File Picker (Implementação Faltante) ---
 
 class DocumentPicker {
   Future<String?> pickDocument() async {
@@ -207,7 +292,7 @@ class DocumentPicker {
 // =========================================================================
 
 class NewAppointmentScreen extends StatefulWidget {
-  final String authToken; 
+  final String authToken; // <--- RECEBE O TOKEN
 
   const NewAppointmentScreen({super.key, required this.authToken});
 
@@ -217,21 +302,23 @@ class NewAppointmentScreen extends StatefulWidget {
 
 class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
   final AppointmentData _appointmentData = AppointmentData();
-  late ApiService _apiService; 
-  final DocumentPicker _documentPicker = DocumentPicker();
+  // Inicialização da API Service com o token recebido
+  late ApiService _apiService; // <--- Inicializada no initState
+  final DocumentPicker _documentPicker = DocumentPicker(); 
   int _currentStep = 1;
   bool _isSubmitting = false;
 
   final GlobalKey<FormState> _patientFormKey = GlobalKey<FormState>();
   final GlobalKey<FormState> _travelFormKey = GlobalKey<FormState>();
+  
+  late Future<PacienteMeData?> _patientDataFuture;
 
   @override
   void initState() {
     super.initState();
+    // INICIALIZAÇÃO DA API SERVICE COM O TOKEN
     _apiService = ApiService(authToken: widget.authToken); 
-    // Inicializa o nome e sobrenome com valores padrão se necessário
-    _appointmentData.nome = "João"; 
-    _appointmentData.sobrenome = "Silva";
+    _patientDataFuture = _apiService.fetchPatientMe();
   }
 
   void _goToNextStep() {
@@ -257,12 +344,10 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
         _currentStep = 1;
       });
     } else {
-      // Se estiver na tela 1, volta para Home
       Navigator.of(context).pop();
     }
   }
 
-  // Lógica de Requisição Final
   Future<void> _submitAppointment() async {
     if (_currentStep == 2) {
       if (_appointmentData.dataSelecionada == null || _appointmentData.horaSelecionada == null) {
@@ -279,9 +364,7 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
           _isSubmitting = true;
         });
 
-        // REQUISIÇÃO SENDO ENVIADA
         final success = await _apiService.sendAppointmentData(_appointmentData);
-        // REQUISIÇÃO CONCLUÍDA
 
         setState(() {
           _isSubmitting = false;
@@ -290,15 +373,15 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
         if (mounted) {
           if (success) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Agendamento enviado para análise!'), backgroundColor: Colors.green));
-            // Navega para a tela de confirmação após o sucesso (substituindo a tela atual)
+            content: Text('Agendamento enviado para análise!'),
+            backgroundColor: Colors.green));
+
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const VerificacaoConcluida()), 
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Erro ao enviar agendamento. Tente novamente.'), backgroundColor: Colors.red));
-          }
+            MaterialPageRoute(
+            builder: (context) => VerificacaoConcluida(authToken: widget.authToken),
+            ),
+          );
+        }
         }
       }
     }
@@ -319,24 +402,44 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
       ),
       body: Column(
         children: [
-          _StepIndicator(currentStep: _currentStep),
+          _StepIndicator(currentStep: _currentStep), 
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: _currentStep == 1
-                  ? PatientStep(
-                      formKey: _patientFormKey,
-                      data: _appointmentData,
-                      apiService: _apiService,
-                      onDataChanged: () => setState(() {}),
-                    )
-                  : TravelStep(
-                      formKey: _travelFormKey,
-                      data: _appointmentData,
-                      apiService: _apiService,
-                      documentPicker: _documentPicker,
-                      onDataChanged: () => setState(() {}),
-                    ),
+            child: FutureBuilder<PacienteMeData?>(
+              future: _patientDataFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                   return Center(child: Text('Erro ao carregar dados do paciente: ${snapshot.error}'));
+                }
+                
+                if (snapshot.data != null) {
+                    _appointmentData.nome = snapshot.data!.nome;
+                    _appointmentData.sobrenome = snapshot.data!.sobrenome;
+                    
+                    if (_appointmentData.enderecoSelecionado == null) {
+                        _appointmentData.enderecoSelecionado = snapshot.data!.enderecoPrincipal;
+                    }
+                }
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _currentStep == 1
+                      ? PatientStep(
+                          formKey: _patientFormKey,
+                          data: _appointmentData,
+                          apiService: _apiService,
+                          onDataChanged: () => setState(() {}),
+                        )
+                      : TravelStep(
+                          formKey: _travelFormKey,
+                          data: _appointmentData,
+                          apiService: _apiService,
+                          documentPicker: _documentPicker,
+                          onDataChanged: () => setState(() {}),
+                        ),
+                );
+              },
             ),
           ),
           Padding(
@@ -368,7 +471,7 @@ class _NewAppointmentScreenState extends State<NewAppointmentScreen> {
 }
 
 // =========================================================================
-// COMPONENTES DE PASSO (Indicadores, PatientStep, TravelStep)
+// COMPONENTES DE PASSO (StepIndicator)
 // =========================================================================
 
 class _StepIndicator extends StatelessWidget {
@@ -378,7 +481,6 @@ class _StepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Layout baseado nas imagens de 1/2 e 2/2
     return Row(
       children: [
         Expanded(
@@ -458,6 +560,7 @@ class _StepIndicator extends StatelessWidget {
   }
 }
 
+
 // =========================================================================
 // PRIMEIRA TELA: PatientStep
 // =========================================================================
@@ -496,19 +599,19 @@ class _PatientStepState extends State<PatientStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Nome
           TextFormField(
             initialValue: widget.data.nome,
-            decoration: const InputDecoration(labelText: 'Nome'), // Baseado na imagem
+            decoration: const InputDecoration(labelText: 'Nome'), 
             validator: (value) =>
                 value!.isEmpty ? 'O nome é obrigatório' : null,
             onSaved: (value) => widget.data.nome = value,
           ),
           const SizedBox(height: 16),
+          // Sobrenome
           TextFormField(
             initialValue: widget.data.sobrenome,
-            decoration: const InputDecoration(labelText: 'Sobrenome'), // Baseado na imagem
-            validator: (value) =>
-                value!.isEmpty ? 'O sobrenome é obrigatório' : null,
+            decoration: const InputDecoration(labelText: 'Sobrenome'), 
             onSaved: (value) => widget.data.sobrenome = value,
           ),
           const SizedBox(height: 16),
@@ -523,7 +626,7 @@ class _PatientStepState extends State<PatientStep> {
                   });
                 },
               ),
-              const Text('Com acompanhante'), // Baseado na imagem
+              const Text('Com acompanhante'), 
             ],
           ),
           const SizedBox(height: 24),
@@ -531,7 +634,7 @@ class _PatientStepState extends State<PatientStep> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
           const Text('Nos informe o seu endereço',
-              style: TextStyle(color: Colors.grey)), // Baseado na imagem
+              style: TextStyle(color: Colors.grey)), 
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
@@ -553,7 +656,15 @@ class _PatientStepState extends State<PatientStep> {
                   );
                 }
 
-                return _buildAddressOptions(snapshot.data ?? [], context);
+                List<Endereco> addresses = snapshot.data ?? [];
+                if (widget.data.enderecoSelecionado != null && 
+                    !addresses.any((e) => e.toString() == widget.data.enderecoSelecionado.toString())) {
+                    
+                    addresses.insert(0, widget.data.enderecoSelecionado!);
+                }
+
+
+                return _buildAddressOptions(addresses, context);
               },
             ),
           ),
@@ -587,7 +698,6 @@ class _PatientStepState extends State<PatientStep> {
             setState(() {
               widget.data.enderecoSelecionado = null;
               widget.onDataChanged();
-              // Simulação de navegação para Adicionar Endereço
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text('Simulação: Navegando para Adicionar Endereço.')));
             });
@@ -624,14 +734,12 @@ class TravelStep extends StatefulWidget {
 }
 
 class _TravelStepState extends State<TravelStep> {
-  late Future<List<HospitalMunicipio>> _hospitalsFuture;
-  late Future<List<HospitalMunicipio>> _municipalitiesFuture;
+  late Future<List<HospitalMunicipio>> _hospitaisFuture;
 
   @override
   void initState() {
     super.initState();
-    _hospitalsFuture = widget.apiService.fetchOptions('hospital');
-    _municipalitiesFuture = widget.apiService.fetchOptions('municipio');
+    _hospitaisFuture = widget.apiService.fetchOptions(); // apenas uma chamada
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -640,6 +748,7 @@ class _TravelStepState extends State<TravelStep> {
       initialDate: widget.data.dataSelecionada ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime(2030),
+      locale: const Locale('pt', 'BR'),
     );
     if (picked != null) {
       setState(() {
@@ -653,6 +762,12 @@ class _TravelStepState extends State<TravelStep> {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: widget.data.horaSelecionada ?? TimeOfDay.now(),
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -689,25 +804,35 @@ class _TravelStepState extends State<TravelStep> {
         children: [
           // Campo Hospital
           FutureBuilder<List<HospitalMunicipio>>(
-            future: _hospitalsFuture,
+            future: _hospitaisFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (snapshot.hasError) {
-                return Text('Erro ao carregar hospitais: ${snapshot.error}');
+              if (snapshot.hasError ||
+                  (snapshot.data == null || snapshot.data!.isEmpty)) {
+                return const Text(
+                  'Erro ao carregar hospitais. Verifique sua autenticação (Token).',
+                  style: TextStyle(color: Colors.red),
+                );
               }
-              final hospitals = snapshot.data ?? [];
+
+              final hospitais = snapshot.data ?? [];
+
               return DropdownButtonFormField<HospitalMunicipio>(
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Hospital'), // Baseado na imagem
+                decoration: const InputDecoration(labelText: 'Hospital'),
                 value: widget.data.hospitalSelecionado,
-                items: hospitals.map((h) {
-                  return DropdownMenuItem(value: h, child: Text(h.nome));
+                items: hospitais.map((h) {
+                  return DropdownMenuItem(
+                    value: h,
+                    child: Text('${h.nomeHospital} - ${h.nomeMunicipio}'),
+                  );
                 }).toList(),
                 onChanged: (value) {
                   setState(() {
                     widget.data.hospitalSelecionado = value;
+                    widget.data.municipioSelecionado = value; // já vem junto
                     widget.onDataChanged();
                   });
                 },
@@ -717,46 +842,18 @@ class _TravelStepState extends State<TravelStep> {
             },
           ),
           const SizedBox(height: 16),
-          // Campo Município
-          FutureBuilder<List<HospitalMunicipio>>(
-            future: _municipalitiesFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SizedBox.shrink();
-              }
-              if (snapshot.hasError) {
-                return Text('Erro ao carregar municípios: ${snapshot.error}');
-              }
-              final municipalities = snapshot.data ?? [];
-              return DropdownButtonFormField<HospitalMunicipio>(
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Município'), // Baseado na imagem
-                value: widget.data.municipioSelecionado,
-                items: municipalities.map((m) {
-                  return DropdownMenuItem(value: m, child: Text(m.nome));
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    widget.data.municipioSelecionado = value;
-                    widget.onDataChanged();
-                  });
-                },
-                validator: (value) =>
-                    value == null ? 'Selecione o município' : null,
-              );
-            },
-          ),
-          const SizedBox(height: 16),
+
           // Campo Procedimento
           TextFormField(
             initialValue: widget.data.procedimento,
-            decoration: const InputDecoration(labelText: 'Procedimento'), // Baseado na imagem
+            decoration: const InputDecoration(labelText: 'Procedimento'),
             onSaved: (value) => widget.data.procedimento = value,
             validator: (value) =>
                 value!.isEmpty ? 'O procedimento é obrigatório' : null,
           ),
           const SizedBox(height: 16),
-          // Campos Data e Horário
+
+          // Campos de Data e Horário
           Row(
             children: [
               Expanded(
@@ -764,7 +861,7 @@ class _TravelStepState extends State<TravelStep> {
                   onTap: () => _pickDate(context),
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'Data', // Baseado na imagem
+                      labelText: 'Data *',
                       hintText: 'Selecione a data',
                     ),
                     child: Row(
@@ -773,10 +870,11 @@ class _TravelStepState extends State<TravelStep> {
                         Text(
                           widget.data.dataSelecionada == null
                               ? 'Data'
-                              : '${widget.data.dataSelecionada!.day}/${widget.data.dataSelecionada!.month}/${widget.data.dataSelecionada!.year}',
+                              : DateFormat('dd/MM/yyyy')
+                                  .format(widget.data.dataSelecionada!),
                           style: DefaultTextStyle.of(context).style,
                         ),
-                        const Icon(Icons.arrow_drop_down),
+                        const Icon(Icons.calendar_today, size: 20),
                       ],
                     ),
                   ),
@@ -788,7 +886,7 @@ class _TravelStepState extends State<TravelStep> {
                   onTap: () => _pickTime(context),
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'horário', // Baseado na imagem
+                      labelText: 'Horário *',
                       hintText: 'Selecione a hora',
                     ),
                     child: Row(
@@ -796,11 +894,11 @@ class _TravelStepState extends State<TravelStep> {
                       children: [
                         Text(
                           widget.data.horaSelecionada == null
-                              ? 'horário'
+                              ? 'Horário'
                               : widget.data.horaSelecionada!.format(context),
                           style: DefaultTextStyle.of(context).style,
                         ),
-                        const Icon(Icons.arrow_drop_down),
+                        const Icon(Icons.access_time, size: 20),
                       ],
                     ),
                   ),
@@ -809,12 +907,13 @@ class _TravelStepState extends State<TravelStep> {
             ],
           ),
           const SizedBox(height: 32),
+
           // Anexo de Documento
           const Text('Documento médico',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
           const Text('Anexe o documento da consulta',
-              style: TextStyle(color: Colors.grey)), // Baseado na imagem
+              style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 8),
           InkWell(
             onTap: _pickDocument,
@@ -827,13 +926,17 @@ class _TravelStepState extends State<TravelStep> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    widget.data.documentoAnexado ??
-                        'Clique aqui para anexar o documento', // Baseado na imagem
-                    style: TextStyle(
+                  Flexible(
+                    child: Text(
+                      widget.data.documentoAnexado ??
+                          'Clique aqui para anexar o documento',
+                      style: TextStyle(
                         color: widget.data.documentoAnexado != null
                             ? Colors.black
-                            : Colors.grey.shade600),
+                            : Colors.grey.shade600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   Icon(Icons.upload_file, color: Colors.blue.shade400),
                 ],
@@ -849,7 +952,8 @@ class _TravelStepState extends State<TravelStep> {
               ),
             ),
           const SizedBox(height: 24),
-          // Campo Observação (Adicional)
+
+          // Campo Observação
           TextFormField(
             initialValue: widget.data.observacao,
             maxLines: 3,
@@ -870,9 +974,10 @@ class _TravelStepState extends State<TravelStep> {
 // WIDGET PLACEHOLDER DE CONFIRMAÇÃO (VerificacaoConcluida)
 // =========================================================================
 
-// Crie este arquivo em 'satep/screen/VerificacaoConcluida.dart'
 class VerificacaoConcluida extends StatelessWidget {
-  const VerificacaoConcluida({super.key});
+  final String authToken;
+
+  const VerificacaoConcluida({super.key, required this.authToken});
 
   @override
   Widget build(BuildContext context) {
@@ -898,7 +1003,12 @@ class VerificacaoConcluida extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Volta para a Home
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HomeScreen(authToken: authToken),
+                  ),
+                );
               },
               child: const Text('Voltar para a Home'),
             ),
