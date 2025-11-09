@@ -7,7 +7,7 @@ import 'package:satep/screen/infoAgendamento.dart';
 // =========================================================================
 // CONFIGURAÇÃO DA API
 // =========================================================================
-const String BASE_URL = 'https://backend-satep-1.onrender.com';
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com';
 const String APPOINTMENTS_ENDPOINT = '/agendamentos/paciente';
 
 // =========================================================================
