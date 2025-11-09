@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 // Função de saída do app
 void Function([int]) appExit = ([int code = 0]) => exit(code);
 
-const String BASE_URL = 'https://backend-satep-1.onrender.com';
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com';
 
 // =========================================================================
 // WIDGETS AUXILIARES
