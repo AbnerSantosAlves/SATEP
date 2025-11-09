@@ -17,7 +17,7 @@ const Color inputFillColor = Color(0xFFF5F5F5);
 // CONFIGURAÇÃO DA API
 // =========================================================================
 
-const String BASE_URL = 'https://backend-satep-1.onrender.com';
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com';
 const String SIGNUP_ENDPOINT = '/pacientes';
 
 // =========================================================================
