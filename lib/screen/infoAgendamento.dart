@@ -5,7 +5,7 @@ import 'dart:convert';
 // =========================================================================
 // CONFIGURAÇÃO DA API (Deve ser a mesma de home.dart)
 // =========================================================================
-const String BASE_URL = 'http://localhost:8000'; 
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com'; 
 
 // =========================================================================
 // MODELO DE DADOS PARA DETALHES COMPLETOS
