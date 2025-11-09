@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-const String BASE_URL = 'https://backend-satep-1.onrender.com';
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com/';
 
 class Configuration extends StatefulWidget {
   final String authToken;
