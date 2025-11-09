@@ -34,8 +34,8 @@ class CadastroUsuarioScreen extends StatelessWidget {
 // 10.0.2.2 é o IP especial para o host loopback (localhost) visto pelo Android Emulator.
 // Usamos localhost para Web/Desktop.
 const String BASE_URL = kIsWeb 
-    ? 'https://backend-satep-1.onrender.com' 
-    : 'https://backend-satep-1.onrender.com';
+    ? 'https://backend-satep-6viy.onrender.com' 
+    : 'https://backend-satep-6viy.onrender.com';
 
 const String LOGIN_ENDPOINT = '/paciente/token'; 
 
