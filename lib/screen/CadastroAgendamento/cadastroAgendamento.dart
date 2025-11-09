@@ -11,7 +11,7 @@ import 'package:satep/screen/Navbar/home.dart';
 // =========================================================================
 
 // Endereços do backend
-const String BASE_URL = 'https://backend-satep-1.onrender.com'; 
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com'; 
 const String ADDRESS_ENDPOINT = '/paciente/enderecos';
 const String OPTIONS_ENDPOINT = '/hospitais'; 
 const String APPOINTMENT_ENDPOINT = '/agendamento/novo'; 
