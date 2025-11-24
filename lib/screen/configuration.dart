@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-const String BASE_URL = 'https://backend-satep-6viy.onrender.com/';
+const String BASE_URL = 'https://backend-satep-6viy.onrender.com';
 
 class Configuration extends StatefulWidget {
   final String authToken;
@@ -14,6 +14,7 @@ class Configuration extends StatefulWidget {
 }
 
 class _ConfigurationState extends State<Configuration> {
+  // Controladores de texto
   final TextEditingController nomeController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController telefoneController = TextEditingController();
@@ -47,17 +48,21 @@ class _ConfigurationState extends State<Configuration> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        setState(() {
-          nomeController.text = data['nome'] ?? '';
-          emailController.text = data['email'] ?? '';
-          telefoneController.text = data['telefone'] ?? '';
-          cpfController.text = data['cpf'] ?? '';
-          nrEnderecoController.text = data['nr_endereco']?.toString() ?? '';
-          nmEnderecoController.text = data['nm_endereco'] ?? '';
-          nmBairroController.text = data['nm_bairro'] ?? '';
-          nmMunicipioController.text = data['nm_municipio'] ?? '';
-          isLoading = false;
-        });
+        // O 'mounted' garante que o setState só é chamado se o widget ainda estiver na árvore.
+        if (mounted) {
+          setState(() {
+            nomeController.text = data['nome'] ?? '';
+            emailController.text = data['email'] ?? '';
+            telefoneController.text = data['telefone'] ?? '';
+            cpfController.text = data['cpf'] ?? '';
+            // Converte para String, garantindo que não seja null
+            nrEnderecoController.text = data['nr_endereco']?.toString() ?? '';
+            nmEnderecoController.text = data['nm_endereco'] ?? '';
+            nmBairroController.text = data['nm_bairro'] ?? '';
+            nmMunicipioController.text = data['nm_municipio'] ?? '';
+            isLoading = false;
+          });
+        }
       } else {
         throw Exception('Erro ${response.statusCode}');
       }
@@ -65,8 +70,12 @@ class _ConfigurationState extends State<Configuration> {
       debugPrint('Erro ao buscar paciente: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao carregar dados do paciente.')),
+          const SnackBar(
+            content: Text('Erro ao carregar dados do paciente.'),
+            backgroundColor: Colors.red,
+          ),
         );
+        setState(() => isLoading = false); // Garantir que o loading pare
       }
     }
   }
@@ -86,7 +95,8 @@ class _ConfigurationState extends State<Configuration> {
       'email': emailController.text,
       'telefone': telefoneController.text,
       'cpf': cpfController.text,
-      'nr_endereco': nrEnderecoController.text,
+      // Converte para inteiro se o campo não estiver vazio
+      'nr_endereco': int.tryParse(nrEnderecoController.text) ?? 0, 
       'nm_endereco': nmEnderecoController.text,
       'nm_bairro': nmBairroController.text,
       'nm_municipio': nmMunicipioController.text,
@@ -125,15 +135,71 @@ class _ConfigurationState extends State<Configuration> {
   }
 
   // ======================================================
+  // COMPONENTE REUTILIZÁVEL PARA OS CAMPOS (Aprimorado)
+  // ======================================================
+  Widget _buildInfoField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    bool isNumeric = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Container(
+        // Adiciona uma sombra sutil para dar profundidade ao campo de texto
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05), // Sombra bem suave
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: controller,
+          keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, color: Colors.blue.shade600), // Cor mantida
+            filled: true,
+            fillColor: Colors.white, // Cor mantida
+            labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+            
+            // Borda padrão e enabled border mantidas para o visual original
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+            ),
+            
+            // Borda focada (ativa) com a cor azul escura original
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ======================================================
   // INTERFACE
   // ======================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.grey.shade100, // Cor de fundo mantida
+      
+      // Floating Action Button (Salvar)
       floatingActionButton: FloatingActionButton.extended(
         onPressed: isSaving ? null : updatePaciente,
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.blue.shade700, // Cor mantida
         label: isSaving
             ? const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10),
@@ -148,13 +214,14 @@ class _ConfigurationState extends State<Configuration> {
               )
             : const Text(
                 "Salvar Alterações",
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white), // Adicionado cor branca explícita
               ),
-        icon: isSaving ? null : const Icon(Icons.save_rounded),
+        icon: isSaving ? null : const Icon(Icons.save_rounded, color: Colors.white), // Adicionado cor branca explícita
       ),
+      
       body: SafeArea(
         child: isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator(color: Colors.blue)) // Cor azul mantida
             : SingleChildScrollView(
                 child: Column(
                   children: [
@@ -166,6 +233,7 @@ class _ConfigurationState extends State<Configuration> {
                       padding: const EdgeInsets.only(
                           top: 30, bottom: 40, left: 20, right: 20),
                       decoration: BoxDecoration(
+                        // Gradiente de cores mantido
                         gradient: LinearGradient(
                           colors: [Colors.blue.shade700, Colors.blue.shade400],
                           begin: Alignment.topLeft,
@@ -175,11 +243,12 @@ class _ConfigurationState extends State<Configuration> {
                           bottomLeft: Radius.circular(30),
                           bottomRight: Radius.circular(30),
                         ),
+                        // Sombra mantida
                         boxShadow: [
                           BoxShadow(
                             color: Colors.blue.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            blurRadius: 15, // Aumentei levemente o blur para melhor destaque
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
@@ -191,35 +260,37 @@ class _ConfigurationState extends State<Configuration> {
                               IconButton(
                                 onPressed: () => Navigator.pop(context),
                                 icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                                    color: Colors.white),
+                                    color: Colors.white), // Cor mantida
                               ),
                             ],
                           ),
                           const SizedBox(height: 10),
                           const CircleAvatar(
                             radius: 45,
-                            backgroundColor: Colors.white,
+                            backgroundColor: Colors.white, // Cor mantida
                             child: Icon(Icons.person_rounded,
-                                color: Colors.blue, size: 50),
+                                color: Colors.blue, size: 50), // Cor mantida
                           ),
                           const SizedBox(height: 15),
                           Text(
+                            // Mostra o nome, ou um placeholder
                             nomeController.text.isEmpty
                                 ? "Paciente"
                                 : nomeController.text,
                             style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: Colors.white, // Cor mantida
                             ),
                           ),
                           const SizedBox(height: 5),
                           Text(
+                            // Mostra o e-mail, ou um placeholder
                             emailController.text.isEmpty
                                 ? "E-mail não informado"
                                 : emailController.text,
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: Colors.white70, // Cor mantida
                               fontSize: 14,
                             ),
                           ),
@@ -260,6 +331,7 @@ class _ConfigurationState extends State<Configuration> {
                             label: "Número do Endereço",
                             controller: nrEnderecoController,
                             icon: Icons.confirmation_number_outlined,
+                            isNumeric: true, // Adicionada prop para teclado numérico
                           ),
                           _buildInfoField(
                             label: "Nome do Endereço",
@@ -276,48 +348,13 @@ class _ConfigurationState extends State<Configuration> {
                             controller: nmMunicipioController,
                             icon: Icons.location_city_rounded,
                           ),
-                          const SizedBox(height: 100),
+                          const SizedBox(height: 100), // Espaço para o FAB
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-      ),
-    );
-  }
-
-  // ======================================================
-  // COMPONENTE REUTILIZÁVEL PARA OS CAMPOS
-  // ======================================================
-  Widget _buildInfoField({
-    required String label,
-    required TextEditingController controller,
-    required IconData icon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: Colors.blue.shade600),
-          filled: true,
-          fillColor: Colors.white,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: Colors.blue.shade700, width: 2),
-          ),
-        ),
       ),
     );
   }
