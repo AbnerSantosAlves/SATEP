@@ -909,50 +909,10 @@ class _TravelStepState extends State<TravelStep> {
           const SizedBox(height: 32),
 
           // Anexo de Documento
-          const Text('Documento médico',
+          const Text('Informações adicionais',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
-          const Text('Anexe o documento da consulta',
-              style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 8),
-          InkWell(
-            onTap: _pickDocument,
-            child: Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Flexible(
-                    child: Text(
-                      widget.data.documentoAnexado ??
-                          'Clique aqui para anexar o documento',
-                      style: TextStyle(
-                        color: widget.data.documentoAnexado != null
-                            ? Colors.black
-                            : Colors.grey.shade600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(Icons.upload_file, color: Colors.blue.shade400),
-                ],
-              ),
-            ),
-          ),
-          if (widget.data.documentoAnexado != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text(
-                'Anexado: ${widget.data.documentoAnexado}',
-                style: const TextStyle(fontSize: 12, color: Colors.green),
-              ),
-            ),
-          const SizedBox(height: 24),
-
+          
           // Campo Observação
           TextFormField(
             initialValue: widget.data.observacao,
