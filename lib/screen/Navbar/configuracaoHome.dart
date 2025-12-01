@@ -1,13 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-// Importação desnecessária, 'dart:io' foi removido e a saída será tratada com Services.
-// import 'dart:io';
-// import 'package:satep/screen/Login/home.dart'; // Mantido para o Logout
-// import 'package:satep/screen/configuration.dart'; // Importação circular/confusa? Assumo que 'Configuration' é a tela de edição
 import 'package:flutter/services.dart';
 
-// Definindo classes para as telas (substitua pelos seus caminhos reais)
+// Definindo classes para as telas
 import 'package:satep/screen/Login/home.dart' show Home;
 import 'package:satep/screen/configuration.dart' show Configuration;
 
@@ -15,44 +11,54 @@ import 'package:satep/screen/configuration.dart' show Configuration;
 // CONSTANTES E VARIÁVEIS GLOBAIS
 // =========================================================================
 
-// Usar um nome mais descritivo para a URL base.
 const String kBaseUrl = 'https://backend-satep-6viy.onrender.com';
 
-// Melhoria na função de saída do app:
-// No Flutter, o 'exit' de dart:io não é recomendado. 'SystemNavigator.pop()' é o método preferencial.
 void appExit() {
   SystemNavigator.pop();
+}
+
+// =========================================================================
+// FUNÇÃO PARA CORRIGIR ACENTOS (UTF-8 quebrado)
+// =========================================================================
+
+String corrigirEncoding(String texto) {
+  try {
+    return utf8.decode(texto.runes.toList());
+  } catch (_) {
+    return texto;
+  }
 }
 
 // =========================================================================
 // MODELO DE DADOS
 // =========================================================================
 
-/// Representa os dados básicos do paciente.
 class Paciente {
   final String nome;
   final String telefone;
 
-  const Paciente({required this.nome, required this.telefone});
+  const Paciente({
+    required this.nome,
+    required this.telefone,
+  });
 
-  // Factory para criar um Paciente a partir de um JSON.
   factory Paciente.fromJson(Map<String, dynamic> json) {
     return Paciente(
-      // Usar null-aware operator para fornecer valores padrão e evitar crashes.
-      nome: json['nome'] ?? "Nome não disponível",
-      telefone: json['telefone'] ?? "Telefone não informado",
+      nome: corrigirEncoding(json['nome'] ?? "Nome não disponível"),
+      telefone: corrigirEncoding(json['telefone'] ?? "Telefone não informado"),
     );
   }
 
-  // Objeto de paciente inicial para o estado de carregamento/erro
   static const Paciente loading = Paciente(
     nome: "Carregando...",
     telefone: "Aguarde",
   );
+
   static const Paciente error = Paciente(
     nome: "Erro ao carregar",
     telefone: "",
   );
+
   static const Paciente connectionFailure = Paciente(
     nome: "Falha na conexão",
     telefone: "",
@@ -60,10 +66,9 @@ class Paciente {
 }
 
 // =========================================================================
-// WIDGETS AUXILIARES (Extraindo para métodos privados)
+// WIDGETS AUXILIARES
 // =========================================================================
 
-// Usar `const` no TextStyle e no Padding.
 Widget _buildSectionTitle(String title) {
   return Padding(
     padding: const EdgeInsets.only(left: 8.0),
@@ -78,7 +83,6 @@ Widget _buildSectionTitle(String title) {
   );
 }
 
-// Uso de parâmetros nomeados e `const` para ListTile.
 Widget _buildSettingItem({
   required IconData icon,
   required String title,
@@ -89,43 +93,46 @@ Widget _buildSettingItem({
   return ListTile(
     leading: Icon(icon, color: iconColor, size: 26),
     title: Text(title, style: const TextStyle(fontSize: 16)),
-    trailing:
-        showChevron ? const Icon(Icons.chevron_right, color: Colors.grey) : null,
+    trailing: showChevron
+        ? const Icon(Icons.chevron_right, color: Colors.grey)
+        : null,
     onTap: onTap,
   );
 }
 
 // =========================================================================
-// SERVIÇO DE DADOS (Extração da lógica de rede)
+// SERVIÇO DE DADOS
 // =========================================================================
 
-/// Serviço responsável por interagir com a API de Pacientes.
 class PacienteService {
   final String baseUrl;
   final String authToken;
 
-  PacienteService({required this.baseUrl, required this.authToken});
+  PacienteService({
+    required this.baseUrl,
+    required this.authToken,
+  });
 
   Future<Paciente> fetchPaciente() async {
     final uri = Uri.parse('$baseUrl/paciente/me');
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $authToken',
-    };
 
     try {
-      final response = await http.get(uri, headers: headers);
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return Paciente.fromJson(data);
       } else {
-        // Log de erro no console para debug
         debugPrint("Erro ao buscar paciente: ${response.statusCode}");
         return Paciente.error;
       }
     } catch (e) {
-      // Log de exceção (erro de conexão, timeout, etc.)
       debugPrint("Erro de conexão: $e");
       return Paciente.connectionFailure;
     }
@@ -137,7 +144,7 @@ class PacienteService {
 // =========================================================================
 
 class ConfiguracaoScreen extends StatefulWidget {
-  final String authToken; // Token vindo da HomeScreen
+  final String authToken;
 
   const ConfiguracaoScreen({super.key, required this.authToken});
 
@@ -146,14 +153,12 @@ class ConfiguracaoScreen extends StatefulWidget {
 }
 
 class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
-  // Inicializa o estado com o objeto de carregamento.
   Paciente _paciente = Paciente.loading;
-  late final PacienteService _service; // Inicializa no initState
+  late final PacienteService _service;
 
   @override
   void initState() {
     super.initState();
-    // Instancia o serviço no initState, usando o token da widget.
     _service = PacienteService(
       baseUrl: kBaseUrl,
       authToken: widget.authToken,
@@ -163,7 +168,6 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
 
   Future<void> _fetchPaciente() async {
     final pacienteData = await _service.fetchPaciente();
-    // Verifica se a widget ainda está montada antes de chamar setState.
     if (mounted) {
       setState(() {
         _paciente = pacienteData;
@@ -171,29 +175,25 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
     }
   }
 
-  // Função para navegar e lidar com o logout
   void _logout(BuildContext context) {
-    // Exemplo de modal/dialog para confirmar o logout (melhoria de UX)
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (ctx) {
         return AlertDialog(
           title: const Text("Sair do Aplicativo"),
           content: const Text("Tem certeza de que deseja sair?"),
-          actions: <Widget>[
+          actions: [
             TextButton(
               child: const Text("Cancelar"),
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: () => Navigator.pop(ctx),
             ),
             TextButton(
               child: const Text("Sair"),
               onPressed: () {
-                // Fecha o dialog
-                Navigator.of(dialogContext).pop();
-                // Navega para a tela de Login (Home) e remove todas as rotas anteriores
+                Navigator.pop(ctx);
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const Home()),
-                  (Route<dynamic> route) => false,
+                  (route) => false,
                 );
               },
             ),
@@ -206,7 +206,6 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Usar cores de fundo e foreground mais claras no AppBar, com elevation zero.
       appBar: AppBar(
         title: const Text('Configurações do Perfil'),
         elevation: 0,
@@ -218,20 +217,13 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // Cartão do perfil
+            children: [
               _buildProfileCard(context, _paciente),
-
               const SizedBox(height: 30),
-
-              // Seção de Conta
               _buildSectionTitle('Conta'),
               const SizedBox(height: 10),
               _buildAccountSettings(context),
-
               const SizedBox(height: 30),
-
-              // Seção Mais
               _buildSectionTitle('Suporte e Ações'),
               const SizedBox(height: 10),
               _buildSupportAndActions(context),
@@ -242,7 +234,6 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
     );
   }
 
-  // Extrai o Cartão do Perfil para um método separado (mais limpo no build).
   Widget _buildProfileCard(BuildContext context, Paciente paciente) {
     return Container(
       padding: const EdgeInsets.all(20.0),
@@ -270,7 +261,7 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                paciente.nome,
+                corrigirEncoding(paciente.nome),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -279,7 +270,7 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                paciente.telefone,
+                corrigirEncoding(paciente.telefone),
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.white70,
@@ -289,14 +280,12 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
             ],
           ),
           const Spacer(),
-          // O ícone de edição (se for clicável, deve ter um GestureDetector ou ser um IconButton)
           const Icon(Icons.edit, color: Colors.white, size: 24),
         ],
       ),
     );
   }
 
-  // Extrai as configurações da Conta para um método separado.
   Widget _buildAccountSettings(BuildContext context) {
     return Card(
       shape: RoundedRectangleBorder(
@@ -310,22 +299,13 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
             title: 'Seu perfil',
             iconColor: Colors.blue.shade700,
             onTap: () {
-              // Uso de 'kBaseUrl' se for passado para a próxima tela
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => Configuration(authToken: widget.authToken),
+                  builder: (context) =>
+                      Configuration(authToken: widget.authToken),
                 ),
               );
-            },
-          ),
-          const Divider(height: 1, indent: 20, endIndent: 20),
-          _buildSettingItem(
-            icon: Icons.lock_outline,
-            title: 'Segurança e Senha',
-            iconColor: Colors.deepPurple.shade700,
-            onTap: () {
-              // Lógica para navegação de Segurança
             },
           ),
         ],
@@ -333,7 +313,6 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
     );
   }
 
-  // Extrai o Suporte e Ações para um método separado.
   Widget _buildSupportAndActions(BuildContext context) {
     return Card(
       shape: RoundedRectangleBorder(
@@ -346,18 +325,14 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
             icon: Icons.info_outline,
             title: 'Sobre o aplicativo',
             iconColor: Colors.green.shade700,
-            onTap: () {
-              // Lógica para navegação Sobre
-            },
+            onTap: () {},
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
           _buildSettingItem(
             icon: Icons.help_outline,
             title: 'Ajuda e FAQ',
             iconColor: Colors.orange.shade700,
-            onTap: () {
-              // Lógica para navegação Ajuda
-            },
+            onTap: () {},
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
           _buildSettingItem(
@@ -365,7 +340,7 @@ class _ConfiguracaoScreenState extends State<ConfiguracaoScreen> {
             title: 'Sair do aplicativo',
             iconColor: Colors.red.shade700,
             showChevron: false,
-            onTap: () => _logout(context), // Chama a função de logout com confirmação
+            onTap: () => _logout(context),
           ),
         ],
       ),

@@ -3,7 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async'; 
 import 'package:flutter/foundation.dart';
-import 'package:satep/screen/Navbar/home.dart'; // Necessário para kIsWeb
+import 'package:satep/screen/CadastroUsuario/CadastroUsuarioScreen.dart';
+import 'package:satep/screen/Navbar/home.dart';
+ // Necessário para kIsWeb
 
 // =========================================================================
 // WIDGETS PLACEHOLDER (Em um projeto real, estariam em arquivos separados)
@@ -339,7 +341,7 @@ class _LoginPageState extends State<LoginPage> {
                        // Navegação para a tela de cadastro (placeholder)
                        if (mounted) {
                          Navigator.of(context).push(
-                           MaterialPageRoute(builder: (context) => const CadastroUsuarioScreen()), 
+                           MaterialPageRoute(builder: (context) => const CadastroUsuario()), 
                          );
                        }
                      },

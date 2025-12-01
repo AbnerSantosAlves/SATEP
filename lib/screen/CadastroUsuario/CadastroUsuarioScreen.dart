@@ -385,9 +385,9 @@ class AddressStep extends StatelessWidget {
             validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
           ),
           CustomTextField(
-            label: 'Complemento',
+            label: 'Número do endereço',
             onSaved: (v) => data.complemento = v,
-            validator: (v) => null,
+            validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
           ),
           const SizedBox(height: 30),
         ],

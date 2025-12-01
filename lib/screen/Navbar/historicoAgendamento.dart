@@ -2,13 +2,24 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:satep/screen/infoAgendamento.dart';
+import 'package:flutter/services.dart';
 
 // =========================================================================
 // CONFIGURAÇÃO DA API
 // =========================================================================
 const String BASE_URL = 'https://backend-satep-6viy.onrender.com';
 const String APPOINTMENTS_ENDPOINT = '/agendamentos/paciente';
+
+// =========================================================================
+// FUNÇÃO PARA CORRIGIR UTF-8
+// =========================================================================
+String fixUtf8(String text) {
+  try {
+    return utf8.decode(text.runes.toList());
+  } catch (_) {
+    return text;
+  }
+}
 
 // =========================================================================
 // MODELO DE DADOS
@@ -32,14 +43,24 @@ class Agendamento {
 
   factory Agendamento.fromJson(Map<String, dynamic> json) {
     final idValue = json['id']?.toString() ?? '-1';
-    final hospitalNome =
-        (json['hospital_nome'] as String?) ??
-        (json['hospital']?['nome'] as String?) ??
-        'Hospital Indisponível';
-    final procedimento = json['procedimento'] as String? ?? 'Detalhe não informado';
+
+    final hospitalNome = fixUtf8(
+      (json['hospital_nome'] as String?) ??
+      (json['hospital']?['nome'] as String?) ??
+      'Hospital Indisponível',
+    );
+
+    final procedimento = fixUtf8(
+      json['procedimento'] as String? ?? 'Detalhe não informado',
+    );
+
     final dataAgendamento = json['data_agendamento'] as String? ?? 'Data não definida';
-    final statusAgendamento =
-        json['status_agendamento'] as String? ?? json['status'] as String? ?? 'Desconhecido';
+
+    final statusAgendamento = fixUtf8(
+      json['status_agendamento'] as String? ??
+      json['status'] as String? ??
+      'Desconhecido'
+    );
 
     return Agendamento(
       id: idValue,
@@ -55,7 +76,7 @@ class Agendamento {
 }
 
 // =========================================================================
-// SERVIÇO DE API PARA AGENDAMENTOS
+// SERVIÇO DA API
 // =========================================================================
 class ApiService {
   final String authToken;
@@ -66,10 +87,15 @@ class ApiService {
         'Authorization': 'Bearer $authToken',
       };
 
-  Future<List<Agendamento>> fetchAgendamentos() async {
-    final uri = Uri.parse('$BASE_URL$APPOINTMENTS_ENDPOINT');
+  Future<List<Agendamento>> fetchAgendamentos(String statusFilter) async {
+    final apiStatus = statusFilter.replaceAll(RegExp(r's$'), '');
+
+    final uri = Uri.parse('$BASE_URL$APPOINTMENTS_ENDPOINT')
+        .replace(queryParameters: {'status': apiStatus});
+
     try {
       final response = await http.get(uri, headers: _headers);
+
       if (response.statusCode == 200) {
         final body = response.body;
         if (body.isEmpty) return [];
@@ -78,23 +104,19 @@ class ApiService {
         if (decoded is List) {
           return decoded.map((item) => Agendamento.fromJson(item)).toList();
         } else {
-          // Caso venha um objeto em vez de lista
           return [];
         }
-      } else if (response.statusCode == 401) {
-        throw Exception('Não autorizado. Faça login novamente.');
       } else {
-        throw Exception('Erro ${response.statusCode}: ${response.body}');
+        throw Exception("Erro ${response.statusCode}: ${response.body}");
       }
     } catch (e) {
-      debugPrint('Erro de rede: $e');
-      throw Exception('Erro de conexão com servidor: $e');
+      throw Exception('Erro de conexão: $e');
     }
   }
 }
 
 // =========================================================================
-// HISTÓRICO DE AGENDAMENTO SCREEN
+// TELA DE HISTÓRICO
 // =========================================================================
 class HistoricoAgendamento extends StatefulWidget {
   final String authToken;
@@ -109,141 +131,151 @@ class _HistoricoAgendamentoState extends State<HistoricoAgendamento> {
   late ApiService _apiService;
   String _selectedFilter = "Finalizados";
 
-  // Status considerados histórico
-  static const List<String> HISTORIC_STATUSES = [
-    'Finalizado',
-    'Cancelado',
-    'Recusado'
-  ];
-
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(authToken: widget.authToken);
-    _historicoFuture = _apiService.fetchAgendamentos();
+    _historicoFuture = _apiService.fetchAgendamentos(_selectedFilter);
   }
 
-  void _refetchHistorico() {
+  Future<void> _fetchAgendamentosWithFilter() async {
     setState(() {
-      _historicoFuture = _apiService.fetchAgendamentos();
+      _historicoFuture = _apiService.fetchAgendamentos(_selectedFilter);
     });
   }
 
-  // Estilo dos filtros (chips)
-  Color _getChipColor(String label, bool isSelected) {
-    if (!isSelected) return Colors.grey.shade100;
-    switch (label) {
-      case 'Finalizados':
-        return Colors.green.shade100;
-      case 'Cancelados':
-        return Colors.red.shade100;
-      case 'Recusados':
-        return Colors.orange.shade100;
-      default:
-        return Colors.blue.shade100;
-    }
-  }
+  // =========================================================================
+  // MODAL DE DETALHES
+  // =========================================================================
+  void _openDetailsModal(Agendamento agenda) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.all(20),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(agenda.icon, color: Colors.blue, size: 32),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        agenda.hospital,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  ],
+                ),
 
-  Color _getChipTextColor(String label, bool isSelected) {
-    if (!isSelected) return Colors.black87;
-    switch (label) {
-      case 'Finalizados':
-        return Colors.green.shade900;
-      case 'Cancelados':
-        return Colors.red.shade900;
-      case 'Recusados':
-        return Colors.orange.shade900;
-      default:
-        return Colors.blue.shade900;
-    }
-  }
+                const SizedBox(height: 15),
 
-  Widget _buildFilterChip(String label) {
-    final selected = _selectedFilter == label;
-    return Padding(
-      padding: const EdgeInsets.only(right: 10),
-      child: ActionChip(
-        label: Text(label),
-        backgroundColor: _getChipColor(label, selected),
-        side: BorderSide(
-          color: selected
-              ? _getChipTextColor(label, selected).withOpacity(0.5)
-              : Colors.grey.shade300,
-          width: 1,
-        ),
-        labelStyle: TextStyle(
-          color: _getChipTextColor(label, selected),
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        onPressed: () {
-          setState(() {
-            _selectedFilter = label;
-          });
-        },
-      ),
+                Text("Procedimento:",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(agenda.detalhe),
+
+                const SizedBox(height: 10),
+
+                Text("Data do Agendamento:",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(agenda.data),
+
+                const SizedBox(height: 10),
+
+                Text("Status:",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(agenda.status),
+
+                const SizedBox(height: 25),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Fechar"),
+                  ),
+                )
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHistoryCard(BuildContext context, Agendamento agenda, Color statusColor) {
+  // =========================================================================
+  // CHIP DE FILTRO
+  // =========================================================================
+  Color _getChipColor(String label, bool selected) {
+    if (!selected) return Colors.grey.shade200;
+    switch (label) {
+      case 'Finalizados':
+        return Colors.green.shade200;
+      case 'Cancelados':
+        return Colors.red.shade200;
+      case 'Recusados':
+        return Colors.orange.shade200;
+      default:
+        return Colors.blue.shade200;
+    }
+  }
+
+  // =========================================================================
+  // CARD DE AGENDAMENTO
+  // =========================================================================
+  Widget _buildHistoryCard(Agendamento agenda, Color statusColor) {
     return Card(
       margin: const EdgeInsets.only(bottom: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 6,
-      shadowColor: statusColor.withOpacity(0.2),
+      elevation: 5,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  InfoAgendamento(agendamentoId: agenda.id, authToken: widget.authToken),
-            ),
-          );
-        },
+        onTap: () => _openDetailsModal(agenda),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(15.0),
+          padding: const EdgeInsets.all(15),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withOpacity(.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(agenda.icon, size: 30, color: statusColor),
+                child: Icon(agenda.icon, color: statusColor, size: 32),
               ),
-              const SizedBox(width: 15),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(agenda.hospital,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 16),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
+                    Text(
+                      agenda.hospital,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Text(agenda.detalhe,
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                        style: const TextStyle(color: Colors.black54)),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text("Data: ${agenda.data}",
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.black54)),
+                            style: TextStyle(color: Colors.grey.shade700)),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.15),
+                            color: statusColor.withOpacity(.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -251,14 +283,14 @@ class _HistoricoAgendamentoState extends State<HistoricoAgendamento> {
                             style: TextStyle(
                                 color: statusColor,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 11),
+                                fontSize: 12),
                           ),
-                        ),
+                        )
                       ],
-                    ),
+                    )
                   ],
                 ),
-              ),
+              )
             ],
           ),
         ),
@@ -274,43 +306,54 @@ class _HistoricoAgendamentoState extends State<HistoricoAgendamento> {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Row(
                 children: [
-                  Icon(Icons.history_toggle_off, color: Colors.blue, size: 30),
+                  Icon(Icons.history, color: Colors.blue, size: 32),
                   SizedBox(width: 10),
                   Text(
                     "Histórico de Agendamentos",
                     style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black87),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ],
               ),
+
               const SizedBox(height: 25),
 
-              const Text("Filtrar por Status:",
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87)),
+              const Text(
+                "Filtrar por status:",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
               const SizedBox(height: 10),
 
               SizedBox(
-                height: 40,
+                height: 38,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    _buildFilterChip("Finalizados"),
-                    _buildFilterChip("Recusados"),
-                    _buildFilterChip("Cancelados"),
+                    for (final label in ["Finalizados", "Recusados", "Cancelados"])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: ChoiceChip(
+                          label: Text(label),
+                          selected: _selectedFilter == label,
+                          selectedColor: _getChipColor(label, true),
+                          onSelected: (_) {
+                            setState(() => _selectedFilter = label);
+                            _fetchAgendamentosWithFilter();
+                          },
+                        ),
+                      ),
                   ],
                 ),
               ),
+
               const SizedBox(height: 20),
 
               Expanded(
@@ -319,52 +362,35 @@ class _HistoricoAgendamentoState extends State<HistoricoAgendamento> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Erro ao carregar histórico.\nDetalhe: ${snapshot.error}',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.red.shade700),
-                              ),
-                              const SizedBox(height: 10),
-                              ElevatedButton(
-                                  onPressed: _refetchHistorico,
-                                  child: const Text("Tentar Novamente"))
-                            ],
-                          ),
-                        ),
-                      );
-                    } else if (snapshot.data == null || snapshot.data!.isEmpty) {
-                      return const Center(
-                          child: Text('Nenhum histórico encontrado.',
-                              style: TextStyle(color: Colors.grey)));
                     }
 
-                    final all = snapshot.data!;
-                    final filteredList = all
-                        .where((agenda) =>
-                            HISTORIC_STATUSES.contains(agenda.status) &&
-                            agenda.status == _selectedFilter)
-                        .toList();
-
-                    if (filteredList.isEmpty) {
+                    if (snapshot.hasError) {
                       return Center(
                         child: Text(
-                            'Nenhum agendamento com status "${_selectedFilter}".',
-                            style: TextStyle(color: Colors.grey.shade600)),
+                          "Erro ao carregar histórico.\n${snapshot.error}",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+
+                    final list = snapshot.data ?? [];
+
+                    if (list.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'Nenhum agendamento com status "${_selectedFilter}".',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
                       );
                     }
 
                     return ListView.builder(
-                      itemCount: filteredList.length,
-                      itemBuilder: (context, i) {
-                        final agenda = filteredList[i];
-                        Color statusColor;
+                      itemCount: list.length,
+                      itemBuilder: (_, i) {
+                        final agenda = list[i];
+                        Color statusColor = Colors.grey;
+
                         switch (agenda.status) {
                           case 'Finalizado':
                             statusColor = Colors.green;
@@ -375,16 +401,14 @@ class _HistoricoAgendamentoState extends State<HistoricoAgendamento> {
                           case 'Recusado':
                             statusColor = Colors.orange;
                             break;
-                          default:
-                            statusColor = Colors.grey;
-                            break;
                         }
-                        return _buildHistoryCard(context, agenda, statusColor);
+
+                        return _buildHistoryCard(agenda, statusColor);
                       },
                     );
                   },
                 ),
-              ),
+              )
             ],
           ),
         ),

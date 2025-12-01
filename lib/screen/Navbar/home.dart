@@ -26,16 +26,18 @@ class Agendamento {
   final String id;
   final String hospital;
   final String detalhe;
-  final DateTime dataHora; // Alterado para DateTime
+  final DateTime dataHora;
+  final DateTime hora; 
   final String status;
   final IconData icon;
-  final String pacienteNome; 
+  final String pacienteNome;
 
   Agendamento({
     required this.id,
     required this.hospital,
     required this.detalhe,
-    required this.dataHora, // Alterado
+    required this.dataHora,
+    required this.hora,
     required this.status,
     required this.pacienteNome,
     this.icon = Icons.local_hospital,
@@ -43,19 +45,60 @@ class Agendamento {
 
   factory Agendamento.fromJson(Map<String, dynamic> json) {
     final idValue = json['id']?.toString() ?? '-1';
-    final hospitalNome = (json['hospital_nome'] as String?) ?? (json['hospital']?['nome'] as String?) ?? 'Hospital Indisponível';
-    final procedimento = json['procedimento'] as String? ?? json['ds_agendamento'] as String? ?? 'Detalhe Não Informado';
-    final dataString = json['data_agendamento'] as String? ?? json['data'] as String? ?? '';
-    
-    // Tenta fazer o parse da data. Se falhar, usa DateTime.now() para evitar crash.
+
+    final hospitalNome = (json['hospital_nome'] as String?) ??
+        (json['hospital']?['nome'] as String?) ??
+        'Hospital Indisponível';
+
+    final procedimento = json['procedimento'] as String? ??
+        json['ds_agendamento'] as String? ??
+        'Detalhe Não Informado';
+
+    final dataString =
+        json['data_agendamento'] as String? ?? json['data'] as String? ?? '';
+
+    final horaString =
+        json['hora_agendamento'] as String? ?? json['hora'] as String? ?? '';
+
+    // -------------------------
+    // PARSE DA DATA
+    // -------------------------
     DateTime dataAgendamento;
     try {
-        dataAgendamento = DateTime.parse(dataString).toLocal();
+      dataAgendamento = DateTime.parse(dataString).toLocal();
     } catch (e) {
-        dataAgendamento = DateTime.now();
+      dataAgendamento = DateTime.now();
     }
 
-    final statusAgendamento = (json['status_agendamento'] as String?) ?? (json['status'] as String?) ?? 'Agendado';
+    // -------------------------
+    // PARSE DA HORA
+    // -------------------------
+    DateTime horaAgendamento;
+    try {
+      // Caso a API envie só "14:30:00"
+      if (horaString.contains(':') && !horaString.contains('-')) {
+        final hoje = DateTime.now();
+        final horaParse = DateTime.parse("1970-01-01 $horaString").toLocal();
+        horaAgendamento = DateTime(
+          hoje.year,
+          hoje.month,
+          hoje.day,
+          horaParse.hour,
+          horaParse.minute,
+          horaParse.second,
+        );
+      } else {
+        // Caso venha um DateTime completo
+        horaAgendamento = DateTime.parse(horaString).toLocal();
+      }
+    } catch (e) {
+      horaAgendamento = DateTime.now();
+    }
+
+    final statusAgendamento = (json['status_agendamento'] as String?) ??
+        (json['status'] as String?) ??
+        'Agendado';
+
     final pacienteNome = (json['paciente'] != null)
         ? (json['paciente']['nome'] as String? ?? 'Paciente')
         : (json['paciente_nome'] as String? ?? 'Paciente');
@@ -64,14 +107,16 @@ class Agendamento {
       id: idValue,
       hospital: hospitalNome,
       detalhe: procedimento,
-      dataHora: dataAgendamento, // Usando DateTime
+      dataHora: dataAgendamento,
+      hora: horaAgendamento,
       status: statusAgendamento,
       pacienteNome: pacienteNome,
-      icon: procedimento.toLowerCase().contains('exame') ? Icons.medical_services : Icons.health_and_safety,
+      icon: procedimento.toLowerCase().contains('exame')
+          ? Icons.medical_services
+          : Icons.health_and_safety,
     );
   }
 }
-
 // =========================================================================
 // SERVIÇO DE API PARA AGENDAMENTOS (Mantido com pequenas correções)
 // =========================================================================
@@ -315,7 +360,7 @@ class _HomePageContentState extends State<_HomePageContent> {
       builder: (ctx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Cancelar Agendamento? ⚠️'),
+          title: const Text('Cancelar Agendamento?'),
           content: const Text('Esta ação não pode ser desfeita. Tem certeza que deseja cancelar este agendamento?', style: TextStyle(color: Colors.black87)),
           actionsAlignment: MainAxisAlignment.spaceBetween,
           actions: [
@@ -420,7 +465,7 @@ class _HomePageContentState extends State<_HomePageContent> {
                                 const SizedBox(width: 15),
                                 Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
                                 const SizedBox(width: 6),
-                                Text(_formatTime(agenda.dataHora), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+                                Text(_formatTime(agenda.hora), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
                               ],
                             ),
                           ],
@@ -725,7 +770,7 @@ class _AppointmentCard extends StatelessWidget {
                       const SizedBox(width: 10),
                       Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
                       const SizedBox(width: 4),
-                      Text(_formatTime(agenda.dataHora), style: const TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w600)),
+                      Text(_formatTime(agenda.hora), style: const TextStyle(fontSize: 13, color: Colors.black87, fontWeight: FontWeight.w600)),
                     ],
                   ),
                   
