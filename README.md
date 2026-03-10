@@ -100,18 +100,6 @@ flutter run
 
 <hr>
 
-<h2>📸 Screenshots</h2>
-
-<p>Adicione aqui imagens do aplicativo:</p>
-
-<pre>
-/screenshots/home.png
-/screenshots/agendamento.png
-/screenshots/paciente.png
-</pre>
-
-<hr>
-
 <h2>📌 Projeto Acadêmico</h2>
 
 <p>
